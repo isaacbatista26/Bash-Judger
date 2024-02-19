@@ -1,9 +1,0 @@
-imagens minimas
-
-redhat m1'
-
-ubi8-minimal
-
-calibrator
-
-
