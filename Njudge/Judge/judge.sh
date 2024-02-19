@@ -1,48 +1,87 @@
 #!/bin/bash
 
-# Pasta contendo os arquivos de submissão
-folder_submissions="../Submissions"
+validate_folder() {
+    cd "../Submissions" || exit 1
+    file=$(ls | grep '\.c$')
+    
+    # Verificar se exatamente um arquivo .c foi encontrado
+    if [ "$(echo $file | wc -w)" -eq 1 ]; then
+        echo "Submission found: $file"
+    else 
+        echo "validate folder failed"
+        exit 1
+    fi
+}
 
-cd "$folder_submissions" || exit 1
-
-# Obter o nome do único arquivo na pasta de submissões
-file=$(ls | grep '\.c$')
-
-# Verificar se exatamente um arquivo .c foi encontrado
-if [ "$(echo $file | wc -w)" -eq 1 ]; then
-    echo "Arquivo de submissão encontrado: $file"
-
+compile() {
     # Nome do executável gerado
     executable="compiled"
-    # como fazer o ./executable?, arranjar uma forma de rodar o ./
-    # Compilar o programa
     gcc "$file" -o "$executable"
-         #CMAKE utlizar flags de compilacao
-         #Compilar 2 arquivos
-        #loop for para verificar cada caso teste de entrada
+}
 
-    # Verificar se a compilação foi bem-sucedida
-    if [ $? -ne 0 ]; then
-        echo "Compilation Error."
-        exit 1 # Saia do script com código de erro
+execution_time() {
+    # Acessar a pasta do gerador
+    cd "../problems/soma_de_cria/generator" || exit 1
+    
+    chmod +x gerador.sh
+    ./gerador.sh
+    
+    cd "../sols/good"
+    sol=$(ls | grep '\.c$')
+    gcc "$sol" -o "sol"
+    
+    # Ditando o limite de tempo
+    TIMEFORMAT='%R'
+    tempo_total=$(time (
+    for (( i=1; i<=10; i++ ))
+    do
+        ./sol < ../../tests/input/$i > ../../tests/output/$i
+    done
+    ) 2>&1)
+    cp ../../tests/input/* ../../../../Inputs
+    cp ../../tests/output/* ../../../../ExpectedOutput
+
+    tempo_total=$(echo "$tempo_total" | tr ',' '.')
+    constante=1.5
+    
+    # Calculando o time limit
+    time_limit=$(echo "$constante * $tempo_total" | bc)
+    
+    echo "o resulta do time limit eh: $time_limit"
+}
+
+# 3. Limitar o tempo em que meu arquivo pode ser compilado
+
+validate_compilation() {
+    cd ../../../../Submissions
+    # Utiliza o comando timeout para limitar o tempo de execução
+    for (( i=1; i<=10; i++ ))
+    do
+        ./compiled < ../Inputs/$i  > ../Output/$i
+        
+        status=$?
+
+    if [ $status -eq 124 ]; then
+        echo "Time Limit Exceeded"
+        exit 1
+    elif [ $status -ne 0 ]; then
+        echo "Runtime Error"
+        exit 1
     else
-        echo "Compilação bem-sucedida. Executando o programa..."
-        # Executar o programa
-        output_program=$(./"$executable")
+        output=$(cat "../Output/$i")
 
-        folder_output="../ExpectedOutput"
-
-        output_expected=$(cat "$folder_output/output.txt")
-
-        # Comparar a saída com um valor esperado
-        if [ "$output_program" = "$output_expected" ]; then
+        expected=$(cat "../ExpectedOutput/$i")
+        if [ "$output" = "$expected" ]; then
             echo "Accepted"
-            echo "$output_program"
         else
             echo "Wrong Answer"
         fi
     fi
-else
-    echo "Nenhum arquivo .c encontrado ou mais de um arquivo encontrado na mesma pasta"
-fi
-    
+    done
+    rm compiled
+}
+
+validate_folder
+compile
+execution_time
+validate_compilation
